@@ -189,6 +189,7 @@ export default function AdminPage() {
       };
 
       const bookingMap = {};
+      const parseSchool = (s) => (String(s || '').split(/[\/\(\-]/)[0] || '').replace(/\s/g, '');
       bookings.forEach(b => {
         if (!b.clinic_date || !b.clinic_time) return;
         const d = new Date(b.clinic_date);
@@ -197,7 +198,7 @@ export default function AdminPage() {
         const dayName = dayNames[d.getDay()]; // '수'
         const timeName = getShortTime(b.clinic_time); // '3시'
         
-        const key = ((b.school || '') + '_' + (b.student_name || '')).replace(/\s/g, '');
+        const key = (parseSchool(b.school) + '_' + (b.student_name || '')).replace(/\s/g, '');
         const text = `${dayName} ${timeName}`;
         
         if (bookingMap[key]) {
@@ -215,7 +216,7 @@ export default function AdminPage() {
         const rowName = data[i][nameIdx];
         
         if (rowSchool && rowName) {
-          const key = (String(rowSchool) + '_' + String(rowName)).replace(/\s/g, '');
+          const key = (parseSchool(rowSchool) + '_' + String(rowName)).replace(/\s/g, '');
           if (bookingMap[key]) {
             // 정확한 엑셀 물리적 행(Row) 위치로 맵핑: 데이터배열 인덱스(i) + 시트의 시작행 오프셋(rowOffset)
             const cellRef = XLSX.utils.encode_cell({c: clinicIdx, r: i + rowOffset});
