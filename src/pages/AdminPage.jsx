@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import * as XLSX from 'xlsx';
+import { getWeekOfMonth } from 'date-fns';
 
 export default function AdminPage() {
   const [loadings, setLoadings] = useState(true);
@@ -9,6 +11,8 @@ export default function AdminPage() {
   const [passwordInput, setPasswordInput] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const attendanceInputRef = useRef(null);
 
   const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '1234';
 
@@ -133,6 +137,114 @@ export default function AdminPage() {
     fetchBookings();
   };
 
+  const handleAttendanceSync = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!confirm('현재 사용중인 출석부 양식(엑셀 원본)을 업로드하면, 학생들의 현재 사이트 예약 내역(예: 수 3시)을 해당 엑셀의 [클리닉 신청] 칸에 자동으로 채워서 새 파일로 다운로드 해줍니다.\n진행하시겠습니까?')) {
+      e.target.value = '';
+      return;
+    }
+
+    setIsUploading(true);
+    
+    try {
+      const dataBuffer = await file.arrayBuffer();
+      const wb = XLSX.read(dataBuffer, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      const rowOffset = range.s.r; // This accounts for sheets that start with empty rows at the top
+      
+      if (!data || data.length < 1) {
+        throw new Error('엑셀 시트에 데이터가 없습니다.');
+      }
+
+      const headerRow = data[0] || [];
+      const normalize = str => (str || '').toString().replace(/\s/g, '');
+      const normalizedHeaders = headerRow.map(normalize);
+      
+      const schoolIdx = normalizedHeaders.findIndex(h => h && h.includes('학교') && !h.includes('학년'));
+      const nameIdx = normalizedHeaders.findIndex(h => h && h.includes('이름'));
+      const clinicIdx = normalizedHeaders.findIndex(h => h && (h.includes('클리닉신청') || h.includes('클리닉')));
+
+      if (schoolIdx === -1 || nameIdx === -1 || clinicIdx === -1) {
+        alert('엑셀 상단(첫 줄)에 "학교", "이름", "클리닉 신청" 이라는 열 이름이 모두 존재해야 합니다!\n\n현재 읽힌 첫 줄: ' + headerRow.join(', '));
+        setIsUploading(false);
+        if (attendanceInputRef.current) attendanceInputRef.current.value = '';
+        return;
+      }
+
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const getShortTime = (timeStr) => {
+        if (!timeStr) return '';
+        const [h, m] = String(timeStr).split(':');
+        const hour = parseInt(h, 10);
+        if (isNaN(hour)) return timeStr;
+        const displayHour = hour > 12 ? hour - 12 : hour;
+        const displayMin = m === '00' ? '' : (m === '30' ? '반' : ` ${m}분`);
+        return `${displayHour}시${displayMin}`;
+      };
+
+      const bookingMap = {};
+      bookings.forEach(b => {
+        if (!b.clinic_date || !b.clinic_time) return;
+        const d = new Date(b.clinic_date);
+        if (isNaN(d.getTime())) return;
+        
+        const dayName = dayNames[d.getDay()]; // '수'
+        const timeName = getShortTime(b.clinic_time); // '3시'
+        
+        const key = ((b.school || '') + '_' + (b.student_name || '')).replace(/\s/g, '');
+        const text = `${dayName} ${timeName}`;
+        
+        if (bookingMap[key]) {
+            if(!bookingMap[key].includes(text)) {
+                bookingMap[key] += `, ${text}`;
+            }
+        } else {
+            bookingMap[key] = text;
+        }
+      });
+
+      for (let i = 1; i < data.length; i++) {
+        if (!data[i]) continue;
+        const rowSchool = data[i][schoolIdx];
+        const rowName = data[i][nameIdx];
+        
+        if (rowSchool && rowName) {
+          const key = (String(rowSchool) + '_' + String(rowName)).replace(/\s/g, '');
+          if (bookingMap[key]) {
+            // 정확한 엑셀 물리적 행(Row) 위치로 맵핑: 데이터배열 인덱스(i) + 시트의 시작행 오프셋(rowOffset)
+            const cellRef = XLSX.utils.encode_cell({c: clinicIdx, r: i + rowOffset});
+            if (!ws[cellRef]) {
+                ws[cellRef] = { t: 's', v: bookingMap[key] };
+            } else {
+                ws[cellRef].v = bookingMap[key];
+            }
+          }
+        }
+      }
+      
+      const now = new Date();
+      const monthNum = now.getMonth() + 1;
+      const weekNum = getWeekOfMonth(now);
+      const outputFileName = `${monthNum}월 ${weekNum}주차 출석부.xlsx`;
+      
+      XLSX.writeFile(wb, outputFileName);
+      alert('출석부에 성공적으로 클리닉 일정이 기록되었습니다!\n[' + outputFileName + '] 파일을 확인해주세요.');
+
+    } catch (err) {
+      console.error(err);
+      alert('엑셀 변환 중 오류가 발생했습니다.\n에러 내용: ' + (err.message || String(err)));
+    }
+    
+    setIsUploading(false);
+    if (attendanceInputRef.current) attendanceInputRef.current.value = '';
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="glass-card animate-fade-in" style={{ maxWidth: '400px', margin: '100px auto', textAlign: 'center' }}>
@@ -151,21 +263,40 @@ export default function AdminPage() {
     <div className="glass-card animate-fade-in">
       <h1 className="heading-primary" style={{marginBottom:'10px'}}>선생님 통합 스케줄</h1>
       <p style={{textAlign:'center', color:'var(--text-muted)', marginBottom:'30px'}}>
-        아래 신청 카드를 드래그하여 다른 시간에 끼워 넣으시라. 취소 칸으로 밀면 삭제됩니다.
+        아래 신청 카드를 드래그하여 다른 시간에 끼워 넣으세요. 취소 칸으로 밀면 삭제됩니다.
       </p>
 
       {/* Admin Settings Panel */}
-      <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' }}>
-         <span style={{ fontSize: '0.9rem', color: '#64748b' }}>⚙️ 비밀번호 변경:</span>
-         <input 
-            type="password" 
-            value={newPassword} 
-            onChange={(e) => setNewPassword(e.target.value)} 
-            placeholder="새 비밀번호 입력" 
-            className="form-input"
-            style={{ width: '150px', padding: '6px 12px', marginBottom: 0, border: '1px solid #cbd5e1' }} 
-         />
-         <button onClick={handleChangePassword} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>저장</button>
+      <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+           {/* Attendance Sync Button */}
+           <input 
+             type="file" 
+             accept=".xlsx, .xls" 
+             style={{ display: 'none' }} 
+             ref={attendanceInputRef}
+             onChange={handleAttendanceSync}
+           />
+           <button 
+             onClick={() => attendanceInputRef.current.click()} 
+             style={{ padding: '8px 16px', background: '#6366f1', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+             disabled={isUploading}
+           >
+             {isUploading ? '작업 중...' : '📋 기존 출석부에 신청내역 기록하기'}
+           </button>
+         </div>
+         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+           <span style={{ fontSize: '0.9rem', color: '#64748b' }}>⚙️ 비밀번호 변경:</span>
+           <input 
+              type="password" 
+              value={newPassword} 
+              onChange={(e) => setNewPassword(e.target.value)} 
+              placeholder="새 비밀번호 입력" 
+              className="form-input"
+              style={{ width: '150px', padding: '6px 12px', marginBottom: 0, border: '1px solid #cbd5e1' }} 
+           />
+           <button onClick={handleChangePassword} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>저장</button>
+         </div>
       </div>
 
       {/* Trash Drop Zone */}
