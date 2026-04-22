@@ -64,12 +64,37 @@ export default function ManagementPage() {
             grade: gradeIdx >= 0 ? String(row[gradeIdx] || '').trim() : '',
             name: String(row[nameIdx] || '').trim(),
             clinicResult: fallbackClinicResultIdx >= 0 ? parseNum(row[fallbackClinicResultIdx]) : 0,
-            rank: rankIdx >= 0 ? parseNum(row[rankIdx]) : 0,
+            rank: 0, // 나중에 직접 계산
             homework: fallbackHwIdx >= 0 ? parseNum(row[fallbackHwIdx]) : 0,
             note: noteIdx >= 0 ? (row[noteIdx] || '') : ''
           });
         }
-        parsedFiles.push({ fileName: file.name, data: rows });
+
+        // 직접 등수 계산 로직 (학교/학년별로 그룹지어 등수 계산)
+        const groupedRows = {};
+        rows.forEach(r => {
+          const key = `${r.school}_${r.grade}`;
+          if (!groupedRows[key]) groupedRows[key] = [];
+          groupedRows[key].push(r);
+        });
+
+        const rankedRows = [];
+        Object.keys(groupedRows).forEach(key => {
+          const group = groupedRows[key];
+          // 시험 점수(clinicResult) 기준 내림차순 정렬
+          group.sort((a, b) => b.clinicResult - a.clinicResult);
+          
+          let currentRank = 1;
+          for (let i = 0; i < group.length; i++) {
+            if (i > 0 && group[i].clinicResult < group[i - 1].clinicResult) {
+              currentRank = i + 1;
+            }
+            group[i].rank = currentRank;
+            rankedRows.push(group[i]);
+          }
+        });
+
+        parsedFiles.push({ fileName: file.name, data: rankedRows });
       }
     }
     
@@ -254,21 +279,26 @@ export default function ManagementPage() {
         {/* STEP 3: Report */}
         {step === 3 && (
           <div>
-            <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
-              <button className="btn-secondary" onClick={() => setStep(2)}>설정으로 돌아가기</button>
-              <select 
-                className="form-select" 
-                style={{ marginBottom: 0, flex: 1 }}
-                value={selectedStudentKey}
-                onChange={e => setSelectedStudentKey(e.target.value)}
-              >
-                <option value="">학생을 선택하세요</option>
-                {allStudents.map(s => {
-                  const [sch, grd, nm] = s.split('_');
-                  return <option key={s} value={s}>{sch} {grd} {nm}</option>
-                })}
-              </select>
-              <button className="btn-primary" onClick={exportAsPNG} disabled={!selectedStudentKey}>PNG 저장</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '25px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button className="btn-secondary" onClick={() => setStep(2)}>⬅ 설정으로 돌아가기</button>
+                <button className="btn-primary" onClick={exportAsPNG} disabled={!selectedStudentKey}>📸 PNG 저장</button>
+              </div>
+              <div>
+                <label className="form-label" style={{ marginBottom: '8px' }}>리포트를 조회할 학생 선택</label>
+                <select 
+                  className="form-select" 
+                  style={{ marginBottom: 0 }}
+                  value={selectedStudentKey}
+                  onChange={e => setSelectedStudentKey(e.target.value)}
+                >
+                  <option value="">학생을 선택하세요</option>
+                  {allStudents.map(s => {
+                    const [sch, grd, nm] = s.split('_');
+                    return <option key={s} value={s}>{sch} {grd} {nm}</option>
+                  })}
+                </select>
+              </div>
             </div>
 
             {selectedStudentKey && (
@@ -286,39 +316,55 @@ export default function ManagementPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                   {/* Chart 1: Homework */}
                   <div>
-                    <h3 style={{ color: '#334155', fontSize: '1.2rem', marginBottom: '15px' }}>📘 숙제 성취율 및 제출 현황</h3>
+                    <h3 style={{ color: '#334155', fontSize: '1.2rem', marginBottom: '15px' }}>📘 숙제 제출 현황</h3>
                     <div style={{ width: '100%', height: '300px' }}>
                       <ResponsiveContainer>
-                        <ComposedChart data={studentReportData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis yAxisId="left" domain={[0, 'dataMax + 10']} label={{ value: '숙제 갯수', angle: -90, position: 'insideLeft' }} />
-                          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} label={{ value: '성취율(%)', angle: 90, position: 'insideRight' }} />
+                        <BarChart data={studentReportData} layout="vertical" margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                          <XAxis type="number" domain={[0, 'dataMax + 10']} label={{ value: '숙제 갯수', position: 'insideBottom', offset: -10 }} />
+                          <YAxis dataKey="name" type="category" width={100} />
                           <Tooltip />
-                          <Legend />
-                          <Bar yAxisId="left" dataKey="homework" name="수행한 숙제" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                          <Line yAxisId="right" type="monotone" dataKey="hwRate" name="성취율(%)" stroke="#f59e0b" strokeWidth={3} dot={{r:5}} />
-                        </ComposedChart>
+                          <Legend verticalAlign="top" />
+                          <Bar dataKey="homework" name="수행한 숙제" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                        </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
 
                   {/* Chart 2: Clinic & Exam */}
                   <div>
-                    <h3 style={{ color: '#334155', fontSize: '1.2rem', marginBottom: '15px' }}>📈 클리닉(시험) 성적 및 등수 추이</h3>
+                    <h3 style={{ color: '#334155', fontSize: '1.2rem', marginBottom: '15px' }}>📈 클리닉(시험) 등수 추이</h3>
                     <div style={{ width: '100%', height: '300px' }}>
                       <ResponsiveContainer>
-                        <ComposedChart data={studentReportData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <LineChart data={studentReportData} margin={{ top: 30, right: 20, bottom: 20, left: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="name" />
-                          <YAxis yAxisId="left" domain={[0, 'dataMax + 5']} label={{ value: '맞힌 문제 수', angle: -90, position: 'insideLeft' }} />
-                          <YAxis yAxisId="right" orientation="right" reversed={true} domain={[1, 'dataMax + 5']} label={{ value: '등수', angle: 90, position: 'insideRight' }} />
-                          <Tooltip />
-                          <Legend />
-                          <Bar yAxisId="left" dataKey="maxClinic" name="총 문제수" fill="#e2e8f0" radius={[4, 4, 0, 0]} />
-                          <Line yAxisId="left" type="monotone" dataKey="clinicResult" name="맞힌 갯수" stroke="#10b981" strokeWidth={3} dot={{r:5}} />
-                          <Line yAxisId="right" type="monotone" dataKey="rank" name="등수" stroke="#ef4444" strokeWidth={3} dot={{r:5, fill:'#ef4444'}} />
-                        </ComposedChart>
+                          <YAxis reversed={true} domain={[1, 'dataMax + 5']} label={{ value: '등수', angle: -90, position: 'insideLeft' }} />
+                          <Tooltip 
+                            formatter={(value, name, props) => {
+                              const d = props.payload;
+                              return [`${value}등 (${d.clinicResult}/${d.maxClinic})`, '상세 기록'];
+                            }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="rank" 
+                            name="등수" 
+                            stroke="#ef4444" 
+                            strokeWidth={3} 
+                            dot={{r:5, fill:'#ef4444'}}
+                            label={(props) => {
+                              const { x, y, stroke, index } = props;
+                              const d = studentReportData[index];
+                              if (!d || d.rank === 0) return null;
+                              return (
+                                <text x={x} y={y - 12} fill={stroke} fontSize={12} textAnchor="middle" fontWeight="bold">
+                                  {d.rank}등 ({d.clinicResult}/{d.maxClinic})
+                                </text>
+                              );
+                            }}
+                          />
+                        </LineChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
