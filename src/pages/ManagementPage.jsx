@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, LabelList } from 'recharts';
 import html2canvas from 'html2canvas';
 
 export default function ManagementPage() {
@@ -321,11 +321,22 @@ export default function ManagementPage() {
                       <ResponsiveContainer>
                         <BarChart data={studentReportData} layout="vertical" margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                          <XAxis type="number" domain={[0, 'dataMax + 10']} label={{ value: '숙제 갯수', position: 'insideBottom', offset: -10 }} />
+                          <XAxis type="number" domain={[0, 150]} ticks={[0, 30, 60, 90, 120, 150]} label={{ value: '숙제 갯수', position: 'insideBottom', offset: -10 }} />
                           <YAxis dataKey="name" type="category" width={100} />
                           <Tooltip />
                           <Legend verticalAlign="top" />
-                          <Bar dataKey="homework" name="수행한 숙제" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="homework" name="수행한 숙제" fill="#3b82f6" radius={[0, 4, 4, 0]}>
+                            <LabelList content={(props) => {
+                              const { x, y, width, height, index } = props;
+                              const d = studentReportData[index];
+                              if (!d) return null;
+                              return (
+                                <text x={x + width + 8} y={y + height / 2} fill="#3b82f6" fontSize={13} textAnchor="start" dominantBaseline="central" fontWeight="bold">
+                                  ({d.homework}/{d.maxHomework})
+                                </text>
+                              );
+                            }} />
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
