@@ -64,6 +64,29 @@ export default function ExamBookingPage() {
       return;
     }
 
+    setLoading(true);
+
+    // 제출 직전에 다시 한번 신청 인원을 확인하여 동시 접속에 의한 초과 예약(Race Condition) 방지
+    const { count: currentCapacity, error: capacityError } = await supabase
+      .from('clinics')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinic_date', formData.clinic_date)
+      .eq('clinic_time', formData.clinic_time)
+      .eq('clinic_type', 'exam');
+
+    if (capacityError) {
+      setLoading(false);
+      alert('예약 현황 확인 중 오류가 발생했습니다.');
+      return;
+    }
+
+    if (currentCapacity >= 2) {
+      setLoading(false);
+      alert('앗! 방금 전 다른 학생이 신청하여 마감되었습니다. 다른 시간을 선택해주세요.');
+      setSlotCount(currentCapacity); // 화면 업데이트
+      return;
+    }
+
     // Check for double booking
     const { count: dupCount } = await supabase
       .from('clinics')
@@ -74,11 +97,10 @@ export default function ExamBookingPage() {
       .eq('school', formData.school);
 
     if (dupCount > 0) {
+      setLoading(false);
       alert('동일한 날짜 및 시간에 이미 학생의 예약이 등록되어 있습니다! (중복 신청 불가)');
       return;
     }
-
-    setLoading(true);
 
     const { error } = await supabase
       .from('clinics')

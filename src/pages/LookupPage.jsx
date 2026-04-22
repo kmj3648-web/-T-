@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-const getEndTime = (timeStr) => {
+const getEndTime = (timeStr, type) => {
   if (!timeStr) return '';
   const [h, m] = timeStr.split(':').map(Number);
+  
+  if (type === 'exam') {
+    let newM = m + 15;
+    let newH = h;
+    if (newM >= 60) {
+      newH += 1;
+      newM -= 60;
+    }
+    return `${newH}:${newM.toString().padStart(2, '0')}`;
+  }
+  
   return `${h + 1}:${m.toString().padStart(2, '0')}`;
 };
 
@@ -79,7 +90,7 @@ export default function LookupPage() {
                     <span style={{ display: 'inline-block', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px', marginRight: '8px', background: r.clinic_type === 'exam' ? '#fdf2f8' : '#fff7ed', color: r.clinic_type === 'exam' ? '#db2777' : '#ea580c', border: r.clinic_type==='exam' ? '1px solid #fbcfe8' : '1px solid #fed7aa' }}>
                       {r.clinic_type === 'exam' ? '시험' : '정규'}
                     </span>
-                    {r.clinic_date} / {r.clinic_time} ~ {getEndTime(r.clinic_time)}
+                    {r.clinic_date} / {r.clinic_time} ~ {getEndTime(r.clinic_time, r.clinic_type)}
                   </div>
                   <div className="slot-subject">신청자: {r.student_name} ({r.school})</div>
                 </div>
