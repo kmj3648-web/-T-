@@ -145,12 +145,12 @@ export default function ManagementPage() {
     if (!selectedStudentKey) return [];
     const [school, grade, name] = selectedStudentKey.split('_');
     
-    return filesData.map(f => {
+    return filesData.map((f, index) => {
       const studentRow = f.data.find(d => d.school === school && d.grade === grade && d.name === name);
       const groupKey = `${school}_${grade}`;
       const config = settings[f.fileName]?.[groupKey] || { maxHomework: 150, maxClinic: 30 };
       
-      const fileNameShort = f.fileName.replace(/\.[^/.]+$/, ""); // remove extension
+      const fileNameShort = `내신 ${index + 1}주차`;
       
       if (!studentRow) {
         return {
@@ -228,7 +228,7 @@ export default function ManagementPage() {
                   disabled={currentFileIndex === 0}
                 >&lt; 이전 파일</button>
                 <h3 style={{ margin: 0, color: '#334155' }}>
-                  [{currentFileIndex + 1} / {filesData.length}] {filesData[currentFileIndex].fileName}
+                  내신 {currentFileIndex + 1}주차 <span style={{fontSize: '0.8rem', color: '#94a3b8', fontWeight: 'normal'}}>({filesData[currentFileIndex].fileName})</span>
                 </h3>
                 <button 
                   className="btn-secondary" 
