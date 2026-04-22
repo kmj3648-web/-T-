@@ -60,9 +60,9 @@ export default function ManagementPage() {
           };
 
           rows.push({
-            school: schoolIdx >= 0 ? (row[schoolIdx] || '') : '',
-            grade: gradeIdx >= 0 ? (row[gradeIdx] || '') : '',
-            name: String(row[nameIdx]).trim(),
+            school: schoolIdx >= 0 ? String(row[schoolIdx] || '').trim() : '',
+            grade: gradeIdx >= 0 ? String(row[gradeIdx] || '').trim() : '',
+            name: String(row[nameIdx] || '').trim(),
             clinicResult: fallbackClinicResultIdx >= 0 ? parseNum(row[fallbackClinicResultIdx]) : 0,
             rank: rankIdx >= 0 ? parseNum(row[rankIdx]) : 0,
             homework: fallbackHwIdx >= 0 ? parseNum(row[fallbackHwIdx]) : 0,
@@ -85,7 +85,7 @@ export default function ManagementPage() {
       initialSettings[f.fileName] = {};
       const uniqueGroups = new Set(f.data.map(d => `${d.school}_${d.grade}`));
       uniqueGroups.forEach(g => {
-        initialSettings[f.fileName][g] = { maxHomework: 100, maxClinic: 100 };
+        initialSettings[f.fileName][g] = { maxHomework: 150, maxClinic: 30 };
       });
     });
     setSettings(initialSettings);
@@ -123,7 +123,7 @@ export default function ManagementPage() {
     return filesData.map(f => {
       const studentRow = f.data.find(d => d.school === school && d.grade === grade && d.name === name);
       const groupKey = `${school}_${grade}`;
-      const config = settings[f.fileName]?.[groupKey] || { maxHomework: 100, maxClinic: 100 };
+      const config = settings[f.fileName]?.[groupKey] || { maxHomework: 150, maxClinic: 30 };
       
       const fileNameShort = f.fileName.replace(/\.[^/.]+$/, ""); // remove extension
       
