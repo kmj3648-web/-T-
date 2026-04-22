@@ -193,6 +193,15 @@ export default function ManagementPage() {
     }
   };
 
+  // 학생 데이터 중 숙제 최대값(수행한 갯수 또는 전체 갯수) 확인 (기본 150)
+  const actualMaxHw = studentReportData.length > 0 
+    ? Math.max(150, ...studentReportData.map(d => d.homework || 0), ...studentReportData.map(d => d.maxHomework || 150))
+    : 150;
+  // 30단위로 올림
+  const chartMaxHw = Math.ceil(actualMaxHw / 30) * 30;
+  // 30단위 틱 배열 생성
+  const hwTicks = Array.from({ length: (chartMaxHw / 30) + 1 }, (_, i) => i * 30);
+
   return (
     <div className="theme-blue">
       <div className="glass-card animate-fade-in" style={{ maxWidth: '900px', margin: '0 auto', minHeight: '600px' }}>
@@ -319,9 +328,9 @@ export default function ManagementPage() {
                     <h3 style={{ color: '#334155', fontSize: '1.2rem', marginBottom: '15px' }}>📘 숙제 제출 현황</h3>
                     <div style={{ width: '100%', height: '300px' }}>
                       <ResponsiveContainer>
-                        <BarChart data={studentReportData} layout="vertical" margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <BarChart data={studentReportData} layout="vertical" margin={{ top: 20, right: 60, bottom: 20, left: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                          <XAxis type="number" domain={[0, 150]} ticks={[0, 30, 60, 90, 120, 150]} label={{ value: '숙제 갯수', position: 'insideBottom', offset: -10 }} />
+                          <XAxis type="number" domain={[0, chartMaxHw]} ticks={hwTicks} label={{ value: '숙제 갯수', position: 'insideBottom', offset: -10 }} />
                           <YAxis dataKey="name" type="category" width={100} />
                           <Tooltip />
                           <Legend verticalAlign="top" />
