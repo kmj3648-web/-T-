@@ -356,7 +356,7 @@ export default function ManagementPage() {
                     <h3 style={{ color: '#334155', fontSize: '1.2rem', marginBottom: '15px' }}>📈 클리닉(시험) 등수 추이</h3>
                     <div style={{ width: '100%', height: '300px' }}>
                       <ResponsiveContainer>
-                        <LineChart data={studentReportData} margin={{ top: 30, right: 20, bottom: 20, left: 20 }}>
+                        <LineChart data={studentReportData} margin={{ top: 30, right: 50, bottom: 20, left: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="name" />
                           <YAxis reversed={true} domain={[1, 'dataMax + 5']} label={{ value: '등수', angle: -90, position: 'insideLeft' }} />
