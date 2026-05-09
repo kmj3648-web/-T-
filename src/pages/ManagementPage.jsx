@@ -13,6 +13,7 @@ export default function ManagementPage() {
   const [selectedStudentKey, setSelectedStudentKey] = useState('');
   const [comment, setComment] = useState('');
   const reportRef = useRef(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -180,17 +181,23 @@ export default function ManagementPage() {
 
   const exportAsPNG = async () => {
     if (!reportRef.current) return;
-    try {
-      const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true });
-      const url = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `${selectedStudentKey.replace(/_/g, ' ')}_분석리포트.png`;
-      link.href = url;
-      link.click();
-    } catch (err) {
-      alert('PNG 저장 중 오류가 발생했습니다.');
-      console.error(err);
-    }
+    setIsExporting(true);
+    
+    setTimeout(async () => {
+      try {
+        const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true });
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `${selectedStudentKey.replace(/_/g, ' ')}_분석리포트.png`;
+        link.href = url;
+        link.click();
+      } catch (err) {
+        alert('PNG 저장 중 오류가 발생했습니다.');
+        console.error(err);
+      } finally {
+        setIsExporting(false);
+      }
+    }, 100);
   };
 
   // 학생 데이터 중 숙제 최대값(수행한 갯수 또는 전체 갯수) 확인 (기본 150)
@@ -410,28 +417,45 @@ export default function ManagementPage() {
                   {/* Teacher's Comment */}
                   <div style={{ marginTop: '10px' }}>
                     <h3 style={{ color: '#334155', fontSize: '1.2rem', marginBottom: '10px' }}>👩‍🏫 선생님 코멘트</h3>
-                    <textarea 
-                      className="form-input" 
-                      style={{ 
-                        minHeight: '100px', 
-                        resize: 'none', 
-                        overflow: 'hidden',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-all',
-                        width: '100%'
-                      }} 
-                      placeholder="학부모님/학생에게 전달할 코멘트를 작성하세요. (PNG에 함께 출력됩니다)"
-                      value={comment}
-                      onChange={e => {
-                        setComment(e.target.value);
-                        e.target.style.height = 'auto';
-                        e.target.style.height = (e.target.scrollHeight) + 'px';
-                      }}
-                      onFocus={e => {
-                        e.target.style.height = 'auto';
-                        e.target.style.height = (e.target.scrollHeight) + 'px';
-                      }}
-                    ></textarea>
+                    {isExporting ? (
+                      <div 
+                        className="form-input" 
+                        style={{ 
+                          minHeight: '100px', 
+                          whiteSpace: 'pre-wrap', 
+                          wordBreak: 'break-all', 
+                          width: '100%', 
+                          height: 'auto',
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1'
+                        }}
+                      >
+                        {comment || ' '}
+                      </div>
+                    ) : (
+                      <textarea 
+                        className="form-input" 
+                        style={{ 
+                          minHeight: '100px', 
+                          resize: 'none', 
+                          overflow: 'hidden',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                          width: '100%'
+                        }} 
+                        placeholder="학부모님/학생에게 전달할 코멘트를 작성하세요. (PNG에 함께 출력됩니다)"
+                        value={comment}
+                        onChange={e => {
+                          setComment(e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = (e.target.scrollHeight) + 'px';
+                        }}
+                        onFocus={e => {
+                          e.target.style.height = 'auto';
+                          e.target.style.height = (e.target.scrollHeight) + 'px';
+                        }}
+                      ></textarea>
+                    )}
                   </div>
                   
                 </div>
