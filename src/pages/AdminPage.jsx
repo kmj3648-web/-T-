@@ -2,8 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 import { getWeekOfMonth, startOfWeek, addDays, subWeeks, addWeeks, format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminPage() {
+  const navigate = useNavigate();
   const [loadings, setLoadings] = useState(true);
   const [bookings, setBookings] = useState([]);
   
@@ -292,6 +294,12 @@ export default function AdminPage() {
              disabled={isUploading}
            >
              {isUploading ? '작업 중...' : '📋 기존 출석부에 신청내역 기록하기'}
+           </button>
+           <button 
+             onClick={() => navigate('/man')} 
+             style={{ padding: '8px 16px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}
+           >
+             📊 성적/출석 리포트 관리
            </button>
          </div>
          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
