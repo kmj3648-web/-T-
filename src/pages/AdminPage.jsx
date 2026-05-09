@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
-import { getWeekOfMonth } from 'date-fns';
+import { getWeekOfMonth, startOfWeek, addDays, subWeeks, addWeeks, format } from 'date-fns';
 
 export default function AdminPage() {
   const [loadings, setLoadings] = useState(true);
@@ -13,6 +13,14 @@ export default function AdminPage() {
   const [newPassword, setNewPassword] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const attendanceInputRef = useRef(null);
+
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
+
+  const handlePrevWeek = () => setCurrentWeekStart(prev => subWeeks(prev, 1));
+  const handleNextWeek = () => setCurrentWeekStart(prev => addWeeks(prev, 1));
+  const handleThisWeek = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
+
+  const weekDates = Array.from({ length: 7 }).map((_, i) => format(addDays(currentWeekStart, i), 'yyyy-MM-dd'));
 
   const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '1234';
 
@@ -311,20 +319,35 @@ export default function AdminPage() {
       
       {loadings ? (
         <p style={{ textAlign: 'center', marginTop: '30px' }}>스케줄을 불러오고 통합하는 중...</p>
-      ) : Object.keys(grouped).length === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop:'30px' }}>현재 신청 내역이 없습니다.</p>
       ) : (
-        Object.keys(grouped).map(date => {
-          const regularBookings = grouped[date].filter(b => b.clinic_type !== 'exam');
-          const examBookings = grouped[date].filter(b => b.clinic_type === 'exam');
+        <>
+          {/* Week Navigation */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginTop: '30px', marginBottom: '20px' }}>
+            <button onClick={handlePrevWeek} style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>◀ 이전 주</button>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#334155' }}>
+              {format(currentWeekStart, 'yyyy년 M월')} {getWeekOfMonth(currentWeekStart)}주차
+            </h2>
+            <button onClick={handleNextWeek} style={{ padding: '8px 16px', background: '#e2e8f0', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>다음 주 ▶</button>
+            <button onClick={handleThisWeek} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '10px' }}>오늘</button>
+          </div>
 
-          return (
-            <div key={date} style={{ marginTop: '50px', border: '1px solid var(--border-color)', borderRadius: '15px', padding: '20px', background: '#fafafa' }}>
-              <h2 style={{ color: '#1f2937', paddingBottom: '10px', fontSize: '1.4rem' }}>
-                📆 {new Date(date).toLocaleDateString('ko-KR', { weekday: 'short', month: 'long', day: 'numeric' })}
-              </h2>
-              
-              {/* Regular Clinics Grid */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {weekDates.map(date => {
+              const dateBookings = grouped[date] || [];
+              const regularBookings = dateBookings.filter(b => b.clinic_type !== 'exam');
+              const examBookings = dateBookings.filter(b => b.clinic_type === 'exam');
+
+              const isToday = format(new Date(), 'yyyy-MM-dd') === date;
+              const dayName = new Date(date).toLocaleDateString('ko-KR', { weekday: 'short' });
+
+              return (
+                <div key={date} style={{ border: isToday ? '2px solid #3b82f6' : '1px solid var(--border-color)', borderRadius: '15px', padding: '20px', background: isToday ? '#eff6ff' : '#fafafa' }}>
+                  <h2 style={{ color: '#1f2937', paddingBottom: '10px', fontSize: '1.4rem', borderBottom: '1px solid #e2e8f0', marginBottom: '15px' }}>
+                    📆 {new Date(date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} ({dayName})
+                    {isToday && <span style={{ marginLeft: '10px', fontSize: '0.9rem', color: 'white', background: '#3b82f6', padding: '3px 8px', borderRadius: '12px' }}>오늘</span>}
+                  </h2>
+                  
+                  {/* Regular Clinics Grid */}
               <div style={{marginTop: '20px', background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #fed7aa', borderLeft: '8px solid #ea580c'}}>
                 <h3 style={{color: '#ea580c', marginTop: 0}}>정규 클리닉 (1시간 단위 / 10명 제한)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '15px' }}>
@@ -398,7 +421,9 @@ export default function AdminPage() {
 
             </div>
           );
-        })
+        })}
+          </div>
+        </>
       )}
     </div>
   );
