@@ -15,8 +15,12 @@ function Navigation() {
       <Link to="/exam" style={{ color: location.pathname === '/exam' ? '#db2777' : 'var(--text-muted)', textDecoration: 'none', fontWeight: 'bold', borderBottom: location.pathname==='/exam' ? '2px solid #db2777' : 'none', paddingBottom: '5px' }}>시험기간 클리닉 신청</Link>
       <Link to="/lookup" style={{ color: location.pathname === '/lookup' ? '#1f2937' : 'var(--text-muted)', textDecoration: 'none', fontWeight: 'bold', borderBottom: location.pathname==='/lookup' ? '2px solid #1f2937' : 'none', paddingBottom: '5px' }}>조회/취소</Link>
       
-      {location.pathname === '/admin' && (
-        <Link to="/admin" style={{ color: '#1f2937', textDecoration: 'none', fontWeight: 'bold', borderBottom: '2px solid #1f2937', paddingBottom: '5px' }}>&nbsp;|&nbsp;&nbsp;관리자 페이지 (열람중)</Link>
+      {(location.pathname === '/admin' || location.pathname === '/man') && (
+        <>
+          <span style={{ color: 'var(--text-muted)', fontWeight: 'bold' }}>&nbsp;|&nbsp;</span>
+          <Link to="/admin" style={{ color: location.pathname === '/admin' ? '#1f2937' : 'var(--text-muted)', textDecoration: 'none', fontWeight: 'bold', borderBottom: location.pathname==='/admin' ? '2px solid #1f2937' : 'none', paddingBottom: '5px' }}>관리자 스케줄</Link>
+          <Link to="/man" style={{ color: location.pathname === '/man' ? '#8b5cf6' : 'var(--text-muted)', textDecoration: 'none', fontWeight: 'bold', borderBottom: location.pathname==='/man' ? '2px solid #8b5cf6' : 'none', paddingBottom: '5px' }}>성적/출석 관리</Link>
+        </>
       )}
     </nav>
   )
