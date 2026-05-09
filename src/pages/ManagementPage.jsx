@@ -412,10 +412,25 @@ export default function ManagementPage() {
                     <h3 style={{ color: '#334155', fontSize: '1.2rem', marginBottom: '10px' }}>👩‍🏫 선생님 코멘트</h3>
                     <textarea 
                       className="form-input" 
-                      style={{ height: '100px', resize: 'vertical' }} 
+                      style={{ 
+                        minHeight: '100px', 
+                        resize: 'none', 
+                        overflow: 'hidden',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all',
+                        width: '100%'
+                      }} 
                       placeholder="학부모님/학생에게 전달할 코멘트를 작성하세요. (PNG에 함께 출력됩니다)"
                       value={comment}
-                      onChange={e => setComment(e.target.value)}
+                      onChange={e => {
+                        setComment(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = (e.target.scrollHeight) + 'px';
+                      }}
+                      onFocus={e => {
+                        e.target.style.height = 'auto';
+                        e.target.style.height = (e.target.scrollHeight) + 'px';
+                      }}
                     ></textarea>
                   </div>
                   
