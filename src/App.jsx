@@ -5,6 +5,7 @@ import ExamBookingPage from './pages/ExamBookingPage'
 import AdminPage from './pages/AdminPage'
 import LookupPage from './pages/LookupPage'
 import ManagementPage from './pages/ManagementPage'
+import DevPage from './pages/DevPage'
 
 function Navigation() {
   const location = useLocation()
@@ -37,6 +38,7 @@ function App() {
           <Route path="/lookup" element={<LookupPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/man" element={<ManagementPage />} />
+          <Route path="/dev" element={<DevPage />} />
         </Routes>
       </div>
     </Router>

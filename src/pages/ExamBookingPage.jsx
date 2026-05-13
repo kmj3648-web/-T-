@@ -16,6 +16,37 @@ export default function ExamBookingPage() {
   const [loading, setLoading] = useState(false);
   const [slotCount, setSlotCount] = useState(0);
 
+  const [config, setConfig] = useState({ days: [3, 4, 5], startTime: '15:00', endTime: '21:30', interval: 15, capacity: 2 });
+  const [times, setTimes] = useState(["15:00", "15:15", "15:30", "15:45", "16:00", "16:15", "16:30", "16:45", "17:00", "17:15", "17:30", "17:45", "18:00", "18:15", "18:30", "18:45", "19:00", "19:15", "19:30", "19:45", "20:00", "20:15", "20:30", "20:45", "21:00", "21:15", "21:30"]);
+
+  useEffect(() => {
+    fetchConfig();
+  }, []);
+
+  const fetchConfig = async () => {
+    const { data } = await supabase.from('settings').select('exam_config').eq('id', 1).single();
+    if (data?.exam_config) {
+      setConfig(data.exam_config);
+      const start = data.exam_config.startTime;
+      const end = data.exam_config.endTime;
+      const interval = data.exam_config.interval;
+      
+      const newTimes = [];
+      let [h, m] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      const startMins = h * 60 + m;
+      const endMins = eh * 60 + em;
+      
+      for (let mins = startMins; mins <= endMins; mins += interval) {
+        const hh = Math.floor(mins / 60).toString().padStart(2, '0');
+        const mm = (mins % 60).toString().padStart(2, '0');
+        newTimes.push(`${hh}:${mm}`);
+      }
+      setTimes(newTimes);
+      setFormData(prev => ({ ...prev, clinic_time: newTimes[0] || '15:00' }));
+    }
+  };
+
   // Week Picker State
   const [currentWeekTop, setCurrentWeekTop] = useState(new Date());
   
@@ -51,7 +82,7 @@ export default function ExamBookingPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const isFull = slotCount >= 2;
+  const isFull = slotCount >= config.capacity;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,7 +91,7 @@ export default function ExamBookingPage() {
       return;
     }
     if (isFull) {
-      alert('선택하신 시험기간 시간대에는 이미 2명의 신청이 마감되었습니다. 다른 시간을 선택해주세요.');
+      alert(`선택하신 시험기간 시간대에는 이미 ${config.capacity}명의 신청이 마감되었습니다. 다른 시간을 선택해주세요.`);
       return;
     }
 
@@ -80,7 +111,7 @@ export default function ExamBookingPage() {
       return;
     }
 
-    if (currentCapacity >= 2) {
+    if (currentCapacity >= config.capacity) {
       setLoading(false);
       alert('앗! 방금 전 다른 학생이 신청하여 마감되었습니다. 다른 시간을 선택해주세요.');
       setSlotCount(currentCapacity); // 화면 업데이트
@@ -123,7 +154,7 @@ export default function ExamBookingPage() {
     }
   };
 
-  const EXAM_TIMES = ["15:00", "15:15", "15:30", "15:45", "16:00", "16:15", "16:30", "16:45", "17:00", "17:15", "17:30", "17:45", "18:00", "18:15", "18:30", "18:45", "19:00", "19:15", "19:30", "19:45", "20:00", "20:15", "20:30", "20:45", "21:00", "21:15", "21:30"];
+
 
   return (
     <div className="theme-pink">
@@ -172,7 +203,7 @@ export default function ExamBookingPage() {
               <div className="week-days-grid">
                 {daysInWeek.map(day => {
                   const dayValue = day.getDay();
-                  const isAvailable = dayValue === 3 || dayValue === 4 || dayValue === 5;
+                  const isAvailable = config.days.includes(dayValue);
                   const dateStr = format(day, 'yyyy-MM-dd');
                   const isSelected = formData.clinic_date === dateStr;
                   
@@ -197,27 +228,30 @@ export default function ExamBookingPage() {
                   );
                 })}
               </div>
-              {!formData.clinic_date && <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px'}}>달력에서 원하는 요일(수/목/금)을 클릭해 주세요.</p>}
+              {!formData.clinic_date && <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px'}}>달력에서 원하는 오픈 요일을 클릭해 주세요.</p>}
             </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">시간 (15분 단위 제한)</label>
+            <label className="form-label">시간 ({config.interval}분 단위)</label>
             <select 
               name="clinic_time"
               className="form-select" 
               value={formData.clinic_time}
               onChange={handleChange}
             >
-              {EXAM_TIMES.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
+              {times.map(t => {
+                const [h, m] = t.split(':').map(Number);
+                const displayH = h > 12 ? h - 12 : h;
+                const ampm = h >= 12 ? '오후' : '오전';
+                return <option key={t} value={t}>{ampm} {displayH}:{m.toString().padStart(2, '0')}</option>;
+              })}
             </select>
           </div>
 
           {formData.clinic_date && formData.clinic_time && (
             <div style={{ padding: '15px', background: isFull ? '#fee2e2' : '#fdf2f8', border: isFull ? '1px solid #ef4444' : '1px solid #fbcfe8', borderRadius: '10px', marginBottom: '20px', fontWeight: 'bold', color: isFull ? '#ef4444' : '#db2777', textAlign: 'center' }}>
-              해당 시간 신청 내역: {slotCount}명 / 최대 2명 {isFull && '(예약 마감)'}
+              해당 시간 신청 내역: {slotCount}명 / 최대 {config.capacity}명 {isFull && '(예약 마감)'}
             </div>
           )}
 

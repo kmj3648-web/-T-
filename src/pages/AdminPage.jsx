@@ -14,6 +14,11 @@ export default function AdminPage() {
   const [isUploading, setIsUploading] = useState(false);
   const attendanceInputRef = useRef(null);
 
+  const [clinicConfig, setClinicConfig] = useState({ days: [3, 4, 5], startTime: '15:00', endTime: '20:00', interval: 60, capacity: 10 });
+  const [examConfig, setExamConfig] = useState({ days: [3, 4, 5], startTime: '15:00', endTime: '21:30', interval: 15, capacity: 2 });
+  const [regTimes, setRegTimes] = useState(['15:00', '16:00', '17:00', '18:00', '19:00', '20:00']);
+  const [exTimes, setExTimes] = useState(["15:00", "15:15", "15:30", "15:45", "16:00", "16:15", "16:30", "16:45", "17:00", "17:15", "17:30", "17:45", "18:00", "18:15", "18:30", "18:45", "19:00", "19:15", "19:30", "19:45", "20:00", "20:15", "20:30", "20:45", "21:00", "21:15", "21:30"]);
+
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
 
   const handlePrevWeek = () => setCurrentWeekStart(prev => subWeeks(prev, 1));
@@ -27,6 +32,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchBookings();
+      fetchConfig();
     }
   }, [isAuthenticated]);
 
@@ -69,6 +75,35 @@ export default function AdminPage() {
     }
   };
 
+  const generateTimes = (config) => {
+    const newTimes = [];
+    let [h, m] = config.startTime.split(':').map(Number);
+    const [eh, em] = config.endTime.split(':').map(Number);
+    const startMins = h * 60 + m;
+    const endMins = eh * 60 + em;
+    
+    for (let mins = startMins; mins <= endMins; mins += config.interval) {
+      const hh = Math.floor(mins / 60).toString().padStart(2, '0');
+      const mm = (mins % 60).toString().padStart(2, '0');
+      newTimes.push(`${hh}:${mm}`);
+    }
+    return newTimes;
+  };
+
+  const fetchConfig = async () => {
+    const { data, error } = await supabase.from('settings').select('clinic_config, exam_config').eq('id', 1).single();
+    if (!error && data) {
+      if (data.clinic_config) {
+        setClinicConfig(data.clinic_config);
+        setRegTimes(generateTimes(data.clinic_config));
+      }
+      if (data.exam_config) {
+        setExamConfig(data.exam_config);
+        setExTimes(generateTimes(data.exam_config));
+      }
+    }
+  };
+
   const fetchBookings = async () => {
     setLoadings(true);
     const { data, error } = await supabase
@@ -88,9 +123,6 @@ export default function AdminPage() {
     acc[b.clinic_date].push(b);
     return acc;
   }, {});
-
-  const REGULAR_TIMES = ['15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
-  const EXAM_TIMES = ["15:00", "15:15", "15:30", "15:45", "16:00", "16:15", "16:30", "16:45", "17:00", "17:15", "17:30", "17:45", "18:00", "18:15", "18:30", "18:45", "19:00", "19:15", "19:30", "19:45", "20:00", "20:15", "20:30", "20:45", "21:00", "21:15", "21:30"];
 
   const onDragStart = (e, id, type) => {
     e.dataTransfer.setData('id', id);
@@ -129,7 +161,7 @@ export default function AdminPage() {
     }
 
     const mode = targetType || draggedType || 'regular';
-    const limit = mode === 'exam' ? 2 : 10;
+    const limit = mode === 'exam' ? examConfig.capacity : clinicConfig.capacity;
     
     // Check capacity first before moving
     const { count } = await supabase.from('clinics').select('*', { count: 'exact', head: true })
@@ -349,9 +381,9 @@ export default function AdminPage() {
                   
                   {/* Regular Clinics Grid */}
               <div style={{marginTop: '20px', background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #fed7aa', borderLeft: '8px solid #ea580c'}}>
-                <h3 style={{color: '#ea580c', marginTop: 0}}>정규 클리닉 (1시간 단위 / 10명 제한)</h3>
+                <h3 style={{color: '#ea580c', marginTop: 0}}>정규 클리닉 ({clinicConfig.interval}분 단위 / {clinicConfig.capacity}명 제한)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '15px' }}>
-                  {REGULAR_TIMES.map(time => {
+                  {regTimes.map(time => {
                     const slotsForTime = regularBookings.filter(b => b.clinic_time === time);
                     return (
                       <div 
@@ -361,7 +393,7 @@ export default function AdminPage() {
                         onDragOver={onDragOver}
                         onDrop={(e) => onDrop(e, date, time, 'regular')}
                       >
-                        <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '8px', color: '#c2410c' }}>{time} <span style={{opacity:0.6}}>({slotsForTime.length}/10)</span></div>
+                        <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '8px', color: '#c2410c' }}>{time} <span style={{opacity:0.6}}>({slotsForTime.length}/{clinicConfig.capacity})</span></div>
                         {slotsForTime.map(b => (
                           <div 
                             key={b.id} 
@@ -383,9 +415,9 @@ export default function AdminPage() {
 
               {/* Exam Clinics Grid */}
               <div className="theme-pink" style={{marginTop: '20px', background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #fbcfe8', borderLeft: '8px solid #db2777'}}>
-                <h3 style={{color: '#db2777', marginTop: 0}}>시험기간 클리닉 (15분 단위 / 2명 제한)</h3>
+                <h3 style={{color: '#db2777', marginTop: 0}}>시험기간 클리닉 ({examConfig.interval}분 단위 / {examConfig.capacity}명 제한)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
-                  {EXAM_TIMES.map(time => {
+                  {exTimes.map(time => {
                     const slotsForTime = examBookings.filter(b => b.clinic_time === time);
                     // Hide empty 15min slots unless Admin is dragging something right now, to save massive vertical space
                     // Wait, if dragging, show all blocks so admin can drop anywhere. If not dragging, show only blocks with data!
@@ -399,7 +431,7 @@ export default function AdminPage() {
                         onDragOver={onDragOver}
                         onDrop={(e) => onDrop(e, date, time, 'exam')}
                       >
-                        <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '8px', color: '#be185d' }}>{time} <span style={{opacity:0.6}}>({slotsForTime.length}/2)</span></div>
+                        <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '8px', color: '#be185d' }}>{time} <span style={{opacity:0.6}}>({slotsForTime.length}/{examConfig.capacity})</span></div>
                         {slotsForTime.map(b => (
                           <div 
                             key={b.id} 

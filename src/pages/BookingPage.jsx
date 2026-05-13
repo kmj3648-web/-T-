@@ -16,6 +16,37 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(false);
   const [slotCount, setSlotCount] = useState(0);
 
+  const [config, setConfig] = useState({ days: [3, 4, 5], startTime: '15:00', endTime: '20:00', interval: 60, capacity: 10 });
+  const [times, setTimes] = useState(["15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]);
+
+  useEffect(() => {
+    fetchConfig();
+  }, []);
+
+  const fetchConfig = async () => {
+    const { data } = await supabase.from('settings').select('clinic_config').eq('id', 1).single();
+    if (data?.clinic_config) {
+      setConfig(data.clinic_config);
+      const start = data.clinic_config.startTime;
+      const end = data.clinic_config.endTime;
+      const interval = data.clinic_config.interval;
+      
+      const newTimes = [];
+      let [h, m] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      const startMins = h * 60 + m;
+      const endMins = eh * 60 + em;
+      
+      for (let mins = startMins; mins <= endMins; mins += interval) {
+        const hh = Math.floor(mins / 60).toString().padStart(2, '0');
+        const mm = (mins % 60).toString().padStart(2, '0');
+        newTimes.push(`${hh}:${mm}`);
+      }
+      setTimes(newTimes);
+      setFormData(prev => ({ ...prev, clinic_time: newTimes[0] || '15:00' }));
+    }
+  };
+
   // Week Picker State
   const [currentWeekTop, setCurrentWeekTop] = useState(new Date());
   
@@ -51,7 +82,7 @@ export default function BookingPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const isFull = slotCount >= 10;
+  const isFull = slotCount >= config.capacity;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,7 +91,7 @@ export default function BookingPage() {
       return;
     }
     if (isFull) {
-      alert('선택하신 시간대에는 이미 10명의 신청이 마감되었습니다. 다른 시간을 선택해주세요.');
+      alert(`선택하신 시간대에는 이미 ${config.capacity}명의 신청이 마감되었습니다. 다른 시간을 선택해주세요.`);
       return;
     }
 
@@ -79,7 +110,7 @@ export default function BookingPage() {
       return;
     }
 
-    if (currentCapacity >= 10) {
+    if (currentCapacity >= config.capacity) {
       setLoading(false);
       alert('앗! 방금 전 다른 학생이 신청하여 마감되었습니다. 다른 시간을 선택해주세요.');
       setSlotCount(currentCapacity); // 화면 업데이트
@@ -168,8 +199,7 @@ export default function BookingPage() {
             <div className="week-days-grid">
               {daysInWeek.map(day => {
                 const dayValue = day.getDay();
-                // 3=Wed, 4=Thu, 5=Fri
-                const isAvailable = dayValue === 3 || dayValue === 4 || dayValue === 5;
+                const isAvailable = config.days.includes(dayValue);
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const isSelected = formData.clinic_date === dateStr;
                 
@@ -194,31 +224,32 @@ export default function BookingPage() {
                 );
               })}
             </div>
-            {!formData.clinic_date && <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px'}}>달력에서 원하는 요일(수/목/금)을 클릭해 주세요.</p>}
+            {!formData.clinic_date && <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px'}}>달력에서 원하는 오픈 요일을 클릭해 주세요.</p>}
           </div>
         </div>
 
         <div className="form-group">
-          <label className="form-label">시간 (3시 ~ 9시)</label>
+          <label className="form-label">시간 (간격: {config.interval}분)</label>
           <select 
             name="clinic_time"
             className="form-select" 
             value={formData.clinic_time}
             onChange={handleChange}
           >
-            <option value="15:00">오후 3:00 ~ 4:00</option>
-            <option value="16:00">오후 4:00 ~ 5:00</option>
-            <option value="17:00">오후 5:00 ~ 6:00</option>
-            <option value="18:00">오후 6:00 ~ 7:00</option>
-            <option value="19:00">오후 7:00 ~ 8:00</option>
-            <option value="20:00">오후 8:00 ~ 9:00</option>
+            {times.map(t => {
+              // Create display time like 오후 3:00
+              const [h, m] = t.split(':').map(Number);
+              const displayH = h > 12 ? h - 12 : h;
+              const ampm = h >= 12 ? '오후' : '오전';
+              return <option key={t} value={t}>{ampm} {displayH}:{m.toString().padStart(2, '0')}</option>;
+            })}
           </select>
         </div>
 
         {/* Capacity Indicator */}
         {formData.clinic_date && formData.clinic_time && (
           <div style={{ padding: '15px', background: isFull ? '#fee2e2' : '#f0fdf4', border: isFull ? '1px solid #ef4444' : '1px solid #22c55e', borderRadius: '10px', marginBottom: '20px', fontWeight: 'bold', color: isFull ? '#ef4444' : '#15803d', textAlign: 'center' }}>
-            해당 시간 신청 내역: {slotCount}명 / 최대 10명 {isFull && '(예약 마감)'}
+            해당 시간 신청 내역: {slotCount}명 / 최대 {config.capacity}명 {isFull && '(예약 마감)'}
           </div>
         )}
 
