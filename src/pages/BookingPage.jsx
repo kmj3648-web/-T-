@@ -27,6 +27,9 @@ export default function BookingPage() {
     const { data } = await supabase.from('settings').select('clinic_config').eq('id', 1).single();
     if (data?.clinic_config) {
       setConfig(data.clinic_config);
+      if (data.clinic_config.teacherName) {
+        document.title = `${data.clinic_config.teacherName}T 클리닉 신청 사이트`;
+      }
       const start = data.clinic_config.startTime;
       const end = data.clinic_config.endTime;
       const interval = data.clinic_config.interval;

@@ -28,6 +28,9 @@ export default function ExamBookingPage() {
     if (data?.exam_config) {
       const teacherName = data.clinic_config?.teacherName || '';
       setConfig({ ...data.exam_config, teacherName });
+      if (teacherName) {
+        document.title = `${teacherName}T 시험기간 클리닉 신청 사이트`;
+      }
       const start = data.exam_config.startTime;
       const end = data.exam_config.endTime;
       const interval = data.exam_config.interval;
