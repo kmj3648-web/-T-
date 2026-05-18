@@ -136,7 +136,7 @@ export default function ExamBookingPage() {
 
     if (studentError || !student) {
       setLoading(false);
-      alert('등록되지 않은 학생입니다. 이름과 생년월일(6자리)을 다시 확인해주세요.');
+      alert('등록되지 않은 학생입니다. 이름과 부모님 전화번호 뒷 4자리를 다시 확인해주세요.');
       return;
     }
 
@@ -204,13 +204,13 @@ export default function ExamBookingPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">생년월일 (6자리)</label>
+              <label className="form-label">부모님 전화번호 뒷 4자리</label>
               <input 
                 type="text" 
                 name="birthdate"
                 className="form-input" 
-                placeholder="예: 080512"
-                maxLength={6}
+                placeholder="예: 1234"
+                maxLength={4}
                 value={formData.birthdate}
                 onChange={handleChange}
                 required 

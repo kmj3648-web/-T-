@@ -103,7 +103,7 @@ export default function RegisterPage() {
     }
 
     if (newStudents.length === 0) {
-      alert('유효한 데이터가 없습니다. (이름, 학교, 학년, 생년월일 순서인지 확인해주세요)');
+      alert('유효한 데이터가 없습니다. (이름, 학교, 학년, 부모님 전화번호 뒷 4자리 순서인지 확인해주세요)');
       return;
     }
 
@@ -146,8 +146,8 @@ export default function RegisterPage() {
               <input type="text" name="grade" className="form-input" value={formData.grade} onChange={handleChange} placeholder="예: 1학년" />
             </div>
             <div className="form-group">
-              <label className="form-label">생년월일(6자리)</label>
-              <input type="text" name="birthdate" className="form-input" value={formData.birthdate} onChange={handleChange} placeholder="예: 080512" maxLength={6} />
+              <label className="form-label">부모님 전화번호 뒷 4자리</label>
+              <input type="text" name="birthdate" className="form-input" value={formData.birthdate} onChange={handleChange} placeholder="예: 1234" maxLength={4} />
             </div>
             <button type="submit" className="btn-primary" style={{ background: '#10b981' }} disabled={loading}>
               {loading ? '처리 중...' : '등록하기'}
@@ -159,13 +159,13 @@ export default function RegisterPage() {
         <div>
           <h2 style={{ fontSize: '1.2rem', marginBottom: '15px', color: '#8b5cf6' }}>엑셀 일괄 등록</h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
-            엑셀에서 <b>[이름, 학교, 학년, 생년월일]</b> 열을 선택 후 복사하여 아래에 붙여넣어 주세요. (이름 | 학교 | 1학년 | 080512)
+            엑셀에서 <b>[이름, 학교, 학년, 부모님 전화번호 뒷 4자리]</b> 열을 선택 후 복사하여 아래에 붙여넣어 주세요. (이름 | 학교 | 1학년 | 1234)
           </p>
           <div className="form-group">
             <textarea 
               className="form-input" 
               style={{ height: '150px', resize: 'vertical' }}
-              placeholder="홍길동	한영고	1학년	080512&#10;김철수	선사고	2학년	080123"
+              placeholder="홍길동	한영고	1학년	1234&#10;김철수	선사고	2학년	5678"
               value={bulkData}
               onChange={(e) => setBulkData(e.target.value)}
             ></textarea>
@@ -190,7 +190,7 @@ export default function RegisterPage() {
                 <th style={{ padding: '12px', color: '#4b5563' }}>이름</th>
                 <th style={{ padding: '12px', color: '#4b5563' }}>학교</th>
                 <th style={{ padding: '12px', color: '#4b5563' }}>학년</th>
-                <th style={{ padding: '12px', color: '#4b5563' }}>생년월일</th>
+                <th style={{ padding: '12px', color: '#4b5563' }}>부모님 전화번호(뒷4자리)</th>
                 <th style={{ padding: '12px', color: '#4b5563', textAlign: 'center' }}>관리</th>
               </tr>
             </thead>
