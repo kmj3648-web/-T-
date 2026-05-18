@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 import { getWeekOfMonth, startOfWeek, addDays, subWeeks, addWeeks, format } from 'date-fns';
@@ -6,6 +7,8 @@ import { getWeekOfMonth, startOfWeek, addDays, subWeeks, addWeeks, format } from
 export default function AdminPage() {
   const [loadings, setLoadings] = useState(true);
   const [bookings, setBookings] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [showUnbookedModal, setShowUnbookedModal] = useState(false);
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -33,8 +36,19 @@ export default function AdminPage() {
     if (isAuthenticated) {
       fetchBookings();
       fetchConfig();
+      fetchStudents();
     }
   }, [isAuthenticated]);
+
+  const fetchStudents = async () => {
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .order('student_name', { ascending: true });
+    if (!error && data) {
+      setStudents(data);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -109,6 +123,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from('clinics')
       .select('*')
+      .neq('clinic_type', 'cancel_log')
       .order('clinic_date', { ascending: true })
       .order('clinic_time', { ascending: true });
 
@@ -340,14 +355,7 @@ export default function AdminPage() {
          </div>
       </div>
 
-      {/* Trash Drop Zone */}
-      <div 
-        className={`trash-zone ${dragActive ? 'active' : ''}`}
-        onDragOver={onDragOver}
-        onDrop={(e) => onDrop(e, 'TRASH', null, null)}
-      >
-        여기로 학생 카드를 드래그하여 예약 취소 (삭제) 처리
-      </div>
+
       
       {loadings ? (
         <p style={{ textAlign: 'center', marginTop: '30px' }}>스케줄을 불러오고 통합하는 중...</p>
@@ -363,6 +371,54 @@ export default function AdminPage() {
             <button onClick={handleThisWeek} style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '10px' }}>오늘</button>
           </div>
 
+          {/* Calculate Booking Stats for Current Week */}
+          {(() => {
+            const bookedStudents = new Set();
+            weekDates.forEach(date => {
+              (grouped[date] || []).forEach(b => {
+                bookedStudents.add(`${b.student_name}_${b.school}`);
+              });
+            });
+            const unbookedStudents = students.filter(s => !bookedStudents.has(`${s.student_name}_${s.school}`));
+
+            return (
+              <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+                <button 
+                  onClick={() => setShowUnbookedModal(true)} 
+                  style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '10px 20px', borderRadius: '30px', cursor: 'pointer', fontWeight: 'bold', color: '#475569', fontSize: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', transition: 'all 0.2s' }}
+                  onMouseOver={(e) => e.target.style.background = '#f1f5f9'}
+                  onMouseOut={(e) => e.target.style.background = '#f8fafc'}
+                >
+                   📊 이번 주 신청 인원: <span style={{color:'#3b82f6'}}>{bookedStudents.size}명</span> / 전체 {students.length}명 <span style={{fontSize:'0.85rem', marginLeft:'10px', color:'#94a3b8'}}>(클릭하여 미신청자 명단 보기)</span>
+                </button>
+                
+                {showUnbookedModal && createPortal(
+                  <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }} onClick={() => setShowUnbookedModal(false)}>
+                    <div className="glass-card animate-fade-in" style={{ width: '400px', maxHeight: '80vh', overflowY: 'auto', background: 'white' }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '15px' }}>
+                        <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#1f2937' }}>이번 주 미신청자 명단 ({unbookedStudents.length}명)</h2>
+                        <button onClick={() => setShowUnbookedModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#94a3b8' }}>&times;</button>
+                      </div>
+                      {unbookedStudents.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: '#10b981', fontWeight: 'bold', padding: '20px 0' }}>🎉 모든 학생이 신청을 완료했습니다!</p>
+                      ) : (
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                          {unbookedStudents.map(s => (
+                            <li key={s.id} style={{ padding: '12px 10px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ fontWeight: 'bold', color: '#334155' }}>{s.student_name}</span> 
+                              <span style={{ color: '#64748b', fontSize: '0.9rem' }}>{s.school}{s.grade ? ` ${s.grade}` : ''}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>,
+                  document.body
+                )}
+              </div>
+            );
+          })()}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {weekDates.map(date => {
               const dateBookings = grouped[date] || [];
@@ -374,10 +430,19 @@ export default function AdminPage() {
 
               return (
                 <div key={date} style={{ border: isToday ? '2px solid #3b82f6' : '1px solid var(--border-color)', borderRadius: '15px', padding: '20px', background: isToday ? '#eff6ff' : '#fafafa' }}>
-                  <h2 style={{ color: '#1f2937', paddingBottom: '10px', fontSize: '1.4rem', borderBottom: '1px solid #e2e8f0', marginBottom: '15px' }}>
-                    📆 {new Date(date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} ({dayName})
-                    {isToday && <span style={{ marginLeft: '10px', fontSize: '0.9rem', color: 'white', background: '#3b82f6', padding: '3px 8px', borderRadius: '12px' }}>오늘</span>}
-                  </h2>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+                    <h2 style={{ margin: 0, color: '#1f2937', fontSize: '1.4rem' }}>
+                      📆 {new Date(date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} ({dayName})
+                      {isToday && <span style={{ marginLeft: '10px', fontSize: '0.9rem', color: 'white', background: '#3b82f6', padding: '3px 8px', borderRadius: '12px' }}>오늘</span>}
+                    </h2>
+                    <div 
+                      style={{ padding: '8px 16px', border: '2px dashed #ef4444', background: dragActive ? '#fee2e2' : '#fef2f2', color: '#ef4444', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold', minWidth: '150px', textAlign: 'center', transition: 'all 0.2s', opacity: dragActive ? 1 : 0.6 }}
+                      onDragOver={onDragOver}
+                      onDrop={(e) => onDrop(e, 'TRASH', null, null)}
+                    >
+                      🗑️ 학생 드래그하여 삭제
+                    </div>
+                  </div>
                   
                   {/* Regular Clinics Grid */}
               <div style={{marginTop: '20px', background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #fed7aa', borderLeft: '8px solid #ea580c'}}>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-const DEFAULT_CLINIC_CONFIG = { days: [3, 4, 5], startTime: '15:00', endTime: '20:00', interval: 60, capacity: 10 };
+const DEFAULT_CLINIC_CONFIG = { days: [3, 4, 5], startTime: '15:00', endTime: '20:00', interval: 60, capacity: 10, teacherName: '' };
 const DEFAULT_EXAM_CONFIG = { days: [3, 4, 5], startTime: '15:00', endTime: '21:30', interval: 15, capacity: 2 };
 
 export default function DevPage() {
@@ -65,7 +65,7 @@ export default function DevPage() {
       
     setLoading(false);
     if (error) {
-      alert('설정 저장 중 오류가 발생했습니다.');
+      alert(`설정 저장 중 오류가 발생했습니다: ${error.message || error.details || JSON.stringify(error)}`);
       console.error(error);
     } else {
       alert('설정이 성공적으로 저장되었습니다!');
@@ -113,6 +113,16 @@ export default function DevPage() {
         <p style={{ textAlign: 'center' }}>설정을 불러오는 중...</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+          
+          {/* 사이트 일반 설정 */}
+          <div style={{ padding: '20px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0', borderLeft: '8px solid #22c55e' }}>
+            <h2 style={{ color: '#16a34a', marginTop: 0, marginBottom: '20px' }}>사이트 일반 설정</h2>
+            <div className="form-group">
+              <label className="form-label">선생님 이름 (예: 민정)</label>
+              <input type="text" className="form-input" value={clinicConfig.teacherName || ''} onChange={e => setClinicConfig({...clinicConfig, teacherName: e.target.value})} placeholder="예: 민정" />
+              <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '5px'}}>입력하신 이름으로 사이트 제목이 변경됩니다. (예: 민정T 클리닉 신청 사이트)</p>
+            </div>
+          </div>
           
           {/* 정규 클리닉 설정 */}
           <div style={{ padding: '20px', background: '#fff7ed', borderRadius: '12px', border: '1px solid #fed7aa', borderLeft: '8px solid #ea580c' }}>

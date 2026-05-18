@@ -8,7 +8,7 @@ export default function ExamBookingPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     student_name: '',
-    school: '예비고1',
+    birthdate: '',
     clinic_date: '',
     clinic_time: '15:00'
   });
@@ -16,7 +16,7 @@ export default function ExamBookingPage() {
   const [loading, setLoading] = useState(false);
   const [slotCount, setSlotCount] = useState(0);
 
-  const [config, setConfig] = useState({ days: [3, 4, 5], startTime: '15:00', endTime: '21:30', interval: 15, capacity: 2 });
+  const [config, setConfig] = useState({ days: [3, 4, 5], startTime: '15:00', endTime: '21:30', interval: 15, capacity: 2, teacherName: '' });
   const [times, setTimes] = useState(["15:00", "15:15", "15:30", "15:45", "16:00", "16:15", "16:30", "16:45", "17:00", "17:15", "17:30", "17:45", "18:00", "18:15", "18:30", "18:45", "19:00", "19:15", "19:30", "19:45", "20:00", "20:15", "20:30", "20:45", "21:00", "21:15", "21:30"]);
 
   useEffect(() => {
@@ -24,9 +24,10 @@ export default function ExamBookingPage() {
   }, []);
 
   const fetchConfig = async () => {
-    const { data } = await supabase.from('settings').select('exam_config').eq('id', 1).single();
+    const { data } = await supabase.from('settings').select('exam_config, clinic_config').eq('id', 1).single();
     if (data?.exam_config) {
-      setConfig(data.exam_config);
+      const teacherName = data.clinic_config?.teacherName || '';
+      setConfig({ ...data.exam_config, teacherName });
       const start = data.exam_config.startTime;
       const end = data.exam_config.endTime;
       const interval = data.exam_config.interval;
@@ -90,6 +91,13 @@ export default function ExamBookingPage() {
       alert('이름과 날짜를 입력해주세요.');
       return;
     }
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (formData.clinic_date < todayStr) {
+      alert('이미 지난 날짜는 신청할 수 없습니다.');
+      return;
+    }
+
     if (isFull) {
       alert(`선택하신 시험기간 시간대에는 이미 ${config.capacity}명의 신청이 마감되었습니다. 다른 시간을 선택해주세요.`);
       return;
@@ -118,18 +126,37 @@ export default function ExamBookingPage() {
       return;
     }
 
-    // Check for double booking
-    const { count: dupCount } = await supabase
+    // 학생 정보 확인
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('school')
+      .eq('student_name', formData.student_name)
+      .eq('birthdate', formData.birthdate)
+      .single();
+
+    if (studentError || !student) {
+      setLoading(false);
+      alert('등록되지 않은 학생입니다. 이름과 생년월일(6자리)을 다시 확인해주세요.');
+      return;
+    }
+
+    // 한 주(일~토) 당 1회 신청 제한 확인
+    const selectedDateObj = new Date(formData.clinic_date);
+    const startDate = format(startOfWeek(selectedDateObj, { weekStartsOn: 0 }), 'yyyy-MM-dd');
+    const endDate = format(endOfWeek(selectedDateObj, { weekStartsOn: 0 }), 'yyyy-MM-dd');
+
+    const { count: weekCount } = await supabase
       .from('clinics')
       .select('*', { count: 'exact', head: true })
-      .eq('clinic_date', formData.clinic_date)
-      .eq('clinic_time', formData.clinic_time)
       .eq('student_name', formData.student_name)
-      .eq('school', formData.school);
+      .eq('school', student.school)
+      .gte('clinic_date', startDate)
+      .lte('clinic_date', endDate)
+      .neq('clinic_type', 'cancel_log');
 
-    if (dupCount > 0) {
+    if (weekCount > 0) {
       setLoading(false);
-      alert('동일한 날짜 및 시간에 이미 학생의 예약이 등록되어 있습니다! (중복 신청 불가)');
+      alert('한 주(일~토)에 하나의 클리닉만 신청할 수 있습니다. 이미 이번 주에 신청한 내역이 있습니다.');
       return;
     }
 
@@ -137,7 +164,7 @@ export default function ExamBookingPage() {
       .from('clinics')
       .insert([{
         student_name: formData.student_name,
-        school: formData.school,
+        school: student.school,
         clinic_date: formData.clinic_date,
         clinic_time: formData.clinic_time,
         clinic_type: 'exam'
@@ -159,7 +186,7 @@ export default function ExamBookingPage() {
   return (
     <div className="theme-pink">
       <div className="glass-card animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <h1 className="heading-primary">민정T 클리닉 신청(시험기간)</h1>
+        <h1 className="heading-primary">{config.teacherName ? `${config.teacherName}T ` : ''}클리닉 신청(시험기간)</h1>
         
         <form onSubmit={handleSubmit}>
           <div className="grid-cols-2">
@@ -177,18 +204,17 @@ export default function ExamBookingPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">학교 선택</label>
-              <div className="radio-group" style={{marginTop: '15px'}}>
-                <label className="radio-label">
-                  <input type="radio" name="school" value="예비고1" className="radio-input" checked={formData.school === '예비고1'} onChange={handleChange} /> 예비고1
-                </label>
-                <label className="radio-label">
-                  <input type="radio" name="school" value="선사고" className="radio-input" checked={formData.school === '선사고'} onChange={handleChange} /> 선사고
-                </label>
-                <label className="radio-label">
-                  <input type="radio" name="school" value="한영고" className="radio-input" checked={formData.school === '한영고'} onChange={handleChange} /> 한영고
-                </label>
-              </div>
+              <label className="form-label">생년월일 (6자리)</label>
+              <input 
+                type="text" 
+                name="birthdate"
+                className="form-input" 
+                placeholder="예: 080512"
+                maxLength={6}
+                value={formData.birthdate}
+                onChange={handleChange}
+                required 
+              />
             </div>
           </div>
 
@@ -203,8 +229,10 @@ export default function ExamBookingPage() {
               <div className="week-days-grid">
                 {daysInWeek.map(day => {
                   const dayValue = day.getDay();
-                  const isAvailable = config.days.includes(dayValue);
                   const dateStr = format(day, 'yyyy-MM-dd');
+                  const todayStr = format(new Date(), 'yyyy-MM-dd');
+                  const isPast = dateStr < todayStr;
+                  const isAvailable = config.days.includes(dayValue) && !isPast;
                   const isSelected = formData.clinic_date === dateStr;
                   
                   let cardClass = 'day-card ';

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 
 const getEndTime = (timeStr, type) => {
   if (!timeStr) return '';
@@ -19,19 +20,41 @@ const getEndTime = (timeStr, type) => {
 };
 
 export default function LookupPage() {
-  const [formData, setFormData] = useState({ student_name: '', school: '예비고1' });
+  const [formData, setFormData] = useState({ student_name: '', birthdate: '' });
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null); // null means not searched yet
   const [isEditing, setIsEditing] = useState(null);
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    if (!formData.student_name || !formData.birthdate) {
+      alert('이름과 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+
     setLoading(true);
+
+    // 1. 학생 정보 확인
+    const { data: studentData, error: studentError } = await supabase
+      .from('students')
+      .select('*')
+      .eq('student_name', formData.student_name)
+      .eq('birthdate', formData.birthdate)
+      .single();
+
+    if (studentError || !studentData) {
+      setLoading(false);
+      alert('학생 정보(이름, 비밀번호)가 일치하지 않거나 등록되지 않았습니다.');
+      return;
+    }
+
+    // 2. 해당 학생의 클리닉 신청 내역 조회
     const { data, error } = await supabase
       .from('clinics')
       .select('*')
-      .eq('student_name', formData.student_name)
-      .eq('school', formData.school)
+      .eq('student_name', studentData.student_name)
+      .eq('school', studentData.school)
+      .neq('clinic_type', 'cancel_log')
       .order('clinic_date', { ascending: false });
     
     setLoading(false);
@@ -42,11 +65,36 @@ export default function LookupPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (confirm('신청을 정말 취소하시겠습니까?')) {
-      const { error } = await supabase.from('clinics').delete().eq('id', id);
+  const handleDelete = async (r) => {
+    const dateObj = new Date(r.clinic_date);
+    const startDate = format(startOfWeek(dateObj, { weekStartsOn: 0 }), 'yyyy-MM-dd');
+    const endDate = format(endOfWeek(dateObj, { weekStartsOn: 0 }), 'yyyy-MM-dd');
+
+    const { count: cancelCount } = await supabase
+      .from('clinics')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_name', r.student_name)
+      .eq('school', r.school)
+      .eq('clinic_type', 'cancel_log')
+      .gte('clinic_date', startDate)
+      .lte('clinic_date', endDate);
+
+    if (cancelCount > 0) {
+      alert('경고: 한 주(일~토)에 취소는 1회만 가능합니다.\\n이미 해당 주차의 취소 횟수를 모두 사용하셨습니다.');
+      return;
+    }
+
+    if (window.confirm('신청을 정말 취소하시겠습니까?\\n취소하시면 이번 주에는 더 이상 다른 예약을 취소할 수 없습니다.')) {
+      const { error } = await supabase.from('clinics').delete().eq('id', r.id);
       if (!error) {
-        setResults(results.filter(r => r.id !== id));
+        await supabase.from('clinics').insert([{
+          student_name: r.student_name,
+          school: r.school,
+          clinic_date: r.clinic_date,
+          clinic_time: '00:00',
+          clinic_type: 'cancel_log'
+        }]);
+        setResults(results.filter(item => item.id !== r.id));
         alert('취소되었습니다.');
       }
     }
@@ -66,12 +114,16 @@ export default function LookupPage() {
           />
         </div>
         <div style={{ flex: 1 }}>
-          <label className="form-label">학교</label>
-          <select className="form-select" value={formData.school} onChange={e => setFormData({...formData, school: e.target.value})}>
-            <option value="예비고1">예비고1</option>
-            <option value="선사고">선사고</option>
-            <option value="한영고">한영고</option>
-          </select>
+          <label className="form-label">비밀번호(생년월일 6자리)</label>
+          <input 
+            type="password" 
+            className="form-input" 
+            placeholder="예: 080512" 
+            maxLength={6}
+            value={formData.birthdate} 
+            onChange={e => setFormData({...formData, birthdate: e.target.value})} 
+            required 
+          />
         </div>
         <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? '조회중...' : '조회하기'}
@@ -95,7 +147,7 @@ export default function LookupPage() {
                   <div className="slot-subject">신청자: {r.student_name} ({r.school})</div>
                 </div>
                 <div>
-                  <button onClick={() => handleDelete(r.id)} className="btn-danger">취소하기</button>
+                  <button onClick={() => handleDelete(r)} className="btn-danger">취소하기</button>
                 </div>
               </div>
             ))
