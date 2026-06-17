@@ -32,6 +32,15 @@ export default function AdminPage() {
 
   const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '1234';
 
+  const getStudentSchoolAndGrade = (studentName, school) => {
+    const student = students.find(s => s.student_name === studentName && s.school === school);
+    if (student && student.grade) {
+      const cleanedGrade = student.grade.replace(/학년/g, '').trim();
+      return `${school} ${cleanedGrade}`;
+    }
+    return school;
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchBookings();
@@ -123,12 +132,12 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from('clinics')
       .select('*')
-      .neq('clinic_type', 'cancel_log')
       .order('clinic_date', { ascending: true })
       .order('clinic_time', { ascending: true });
 
     if (!error && data) {
-      setBookings(data);
+      const activeBookings = data.filter(b => !['cancel_log', 'cancel_log_regular', 'cancel_log_exam'].includes(b.clinic_type));
+      setBookings(activeBookings);
     }
     setLoadings(false);
   };
@@ -247,6 +256,7 @@ export default function AdminPage() {
       const parseSchool = (s) => (String(s || '').split(/[\/\(\-]/)[0] || '').replace(/\s/g, '');
       bookings.forEach(b => {
         if (!b.clinic_date || !b.clinic_time) return;
+        if (!weekDates.includes(b.clinic_date)) return;
         const d = new Date(b.clinic_date);
         if (isNaN(d.getTime())) return;
         
@@ -284,9 +294,8 @@ export default function AdminPage() {
         }
       }
       
-      const now = new Date();
-      const monthNum = now.getMonth() + 1;
-      const weekNum = getWeekOfMonth(now);
+      const monthNum = format(currentWeekStart, 'M');
+      const weekNum = getWeekOfMonth(currentWeekStart);
       const outputFileName = `${monthNum}월 ${weekNum}주차 출석부.xlsx`;
       
       XLSX.writeFile(wb, outputFileName);
@@ -469,7 +478,7 @@ export default function AdminPage() {
                             onDragEnd={onDragEnd}
                           >
                             <div className="slot-name" style={{fontSize: '0.9rem'}}>{b.student_name}</div>
-                            <div className="slot-subject" style={{fontSize: '0.75rem'}}>{b.school}</div>
+                            <div className="slot-subject" style={{fontSize: '0.75rem'}}>{getStudentSchoolAndGrade(b.student_name, b.school)}</div>
                           </div>
                         ))}
                       </div>
@@ -507,7 +516,7 @@ export default function AdminPage() {
                             onDragEnd={onDragEnd}
                           >
                             <div className="slot-name" style={{fontSize: '0.9rem'}}>{b.student_name}</div>
-                            <div className="slot-subject" style={{fontSize: '0.75rem'}}>{b.school}</div>
+                            <div className="slot-subject" style={{fontSize: '0.75rem'}}>{getStudentSchoolAndGrade(b.student_name, b.school)}</div>
                           </div>
                         ))}
                       </div>

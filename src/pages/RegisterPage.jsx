@@ -190,7 +190,7 @@ export default function RegisterPage() {
                 <th style={{ padding: '12px', color: '#4b5563' }}>이름</th>
                 <th style={{ padding: '12px', color: '#4b5563' }}>학교</th>
                 <th style={{ padding: '12px', color: '#4b5563' }}>학년</th>
-                <th style={{ padding: '12px', color: '#4b5563' }}>부모님 전화번호(뒷4자리)</th>
+                <th style={{ padding: '12px', color: '#4b5563' }}>비밀번호(뒷 4자리)</th>
                 <th style={{ padding: '12px', color: '#4b5563', textAlign: 'center' }}>관리</th>
               </tr>
             </thead>

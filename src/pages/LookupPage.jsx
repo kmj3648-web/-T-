@@ -54,12 +54,11 @@ export default function LookupPage() {
       .select('*')
       .eq('student_name', studentData.student_name)
       .eq('school', studentData.school)
-      .neq('clinic_type', 'cancel_log')
       .order('clinic_date', { ascending: false });
     
     setLoading(false);
     if (!error) {
-      setResults(data);
+      setResults(data ? data.filter(item => !['cancel_log', 'cancel_log_regular', 'cancel_log_exam'].includes(item.clinic_type)) : []);
     } else {
       alert('조회 중 오류가 발생했습니다.');
     }
@@ -70,21 +69,33 @@ export default function LookupPage() {
     const startDate = format(startOfWeek(dateObj, { weekStartsOn: 0 }), 'yyyy-MM-dd');
     const endDate = format(endOfWeek(dateObj, { weekStartsOn: 0 }), 'yyyy-MM-dd');
 
-    const { count: cancelCount } = await supabase
+    const isExam = r.clinic_type === 'exam';
+    const logType = isExam ? 'cancel_log_exam' : 'cancel_log_regular';
+    const typeLabel = isExam ? '시험기간' : '정규';
+
+    const { data: cancelLogs, error: cancelError } = await supabase
       .from('clinics')
-      .select('*', { count: 'exact', head: true })
+      .select('*')
       .eq('student_name', r.student_name)
       .eq('school', r.school)
-      .eq('clinic_type', 'cancel_log')
       .gte('clinic_date', startDate)
       .lte('clinic_date', endDate);
 
-    if (cancelCount > 0) {
-      alert('경고: 한 주(일~토)에 취소는 1회만 가능합니다.\\n이미 해당 주차의 취소 횟수를 모두 사용하셨습니다.');
+    if (cancelError) {
+      alert('취소 이력 조회 중 오류가 발생했습니다.');
       return;
     }
 
-    if (window.confirm('신청을 정말 취소하시겠습니까?\\n취소하시면 이번 주에는 더 이상 다른 예약을 취소할 수 없습니다.')) {
+    const cancelCount = cancelLogs
+      ? cancelLogs.filter(b => isExam ? b.clinic_type === 'cancel_log_exam' : ['cancel_log', 'cancel_log_regular'].includes(b.clinic_type)).length
+      : 0;
+
+    if (cancelCount >= 2) {
+      alert(`경고: 한 주(일~토)에 ${typeLabel} 클리닉 취소는 최대 2회만 가능합니다.\n이미 해당 주차의 취소 횟수를 모두 사용하셨습니다.`);
+      return;
+    }
+
+    if (window.confirm(`${typeLabel} 클리닉 신청을 정말 취소하시겠습니까?\n취소하시면 이번 주에는 해당 유형의 클리닉을 최대 2회까지만 취소할 수 있습니다. (현재 취소 횟수: ${cancelCount}/2)`)) {
       const { error } = await supabase.from('clinics').delete().eq('id', r.id);
       if (!error) {
         await supabase.from('clinics').insert([{
@@ -92,7 +103,7 @@ export default function LookupPage() {
           school: r.school,
           clinic_date: r.clinic_date,
           clinic_time: '00:00',
-          clinic_type: 'cancel_log'
+          clinic_type: logType
         }]);
         setResults(results.filter(item => item.id !== r.id));
         alert('취소되었습니다.');

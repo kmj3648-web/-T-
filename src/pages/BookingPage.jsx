@@ -27,9 +27,6 @@ export default function BookingPage() {
     const { data } = await supabase.from('settings').select('clinic_config').eq('id', 1).single();
     if (data?.clinic_config) {
       setConfig(data.clinic_config);
-      if (data.clinic_config.teacherName) {
-        document.title = `${data.clinic_config.teacherName}T 클리닉 신청 사이트`;
-      }
       const start = data.clinic_config.startTime;
       const end = data.clinic_config.endTime;
       const interval = data.clinic_config.interval;
@@ -137,7 +134,7 @@ export default function BookingPage() {
 
     if (studentError || !student) {
       setLoading(false);
-      alert('등록되지 않은 학생입니다. 이름과 부모님 전화번호 뒷 4자리를 다시 확인해주세요.');
+      alert('등록되지 않은 학생입니다. 이름과 비밀번호(부모님 전화번호 뒷 4자리)를 다시 확인해주세요.');
       return;
     }
 
@@ -146,16 +143,23 @@ export default function BookingPage() {
     const startDate = format(startOfWeek(selectedDateObj, { weekStartsOn: 0 }), 'yyyy-MM-dd');
     const endDate = format(endOfWeek(selectedDateObj, { weekStartsOn: 0 }), 'yyyy-MM-dd');
 
-    const { count: weekCount } = await supabase
+    const { data: weekBookings, error: weekError } = await supabase
       .from('clinics')
-      .select('*', { count: 'exact', head: true })
+      .select('*')
       .eq('student_name', formData.student_name)
       .eq('school', student.school)
       .gte('clinic_date', startDate)
-      .lte('clinic_date', endDate)
-      .neq('clinic_type', 'cancel_log');
+      .lte('clinic_date', endDate);
 
-    if (weekCount > 0) {
+    if (weekError) {
+      setLoading(false);
+      alert('신청 제한 확인 중 오류가 발생했습니다.');
+      return;
+    }
+
+    const activeWeekCount = weekBookings ? weekBookings.filter(b => !['cancel_log', 'cancel_log_regular', 'cancel_log_exam'].includes(b.clinic_type)).length : 0;
+
+    if (activeWeekCount > 0) {
       setLoading(false);
       alert('한 주(일~토)에 하나의 클리닉만 신청할 수 있습니다. 이미 이번 주에 신청한 내역이 있습니다.');
       return;
