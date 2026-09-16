@@ -2,8 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
-import { getWeekOfMonth, startOfWeek, addDays, subWeeks, addWeeks, format } from 'date-fns';
+import { getWeekOfMonth, startOfWeek, addDays, subWeeks, addWeeks, subMonths, format } from 'date-fns';
 import ErrorModal, { parseError } from '../components/ErrorModal';
+import { generateTimeSlots } from '../lib/utils';
 
 export default function AdminPage() {
   const [loadings, setLoadings] = useState(true);
@@ -106,31 +107,16 @@ export default function AdminPage() {
     }
   };
 
-  const generateTimes = (config) => {
-    const newTimes = [];
-    let [h, m] = config.startTime.split(':').map(Number);
-    const [eh, em] = config.endTime.split(':').map(Number);
-    const startMins = h * 60 + m;
-    const endMins = eh * 60 + em;
-    
-    for (let mins = startMins; mins <= endMins; mins += config.interval) {
-      const hh = Math.floor(mins / 60).toString().padStart(2, '0');
-      const mm = (mins % 60).toString().padStart(2, '0');
-      newTimes.push(`${hh}:${mm}`);
-    }
-    return newTimes;
-  };
-
   const fetchConfig = async () => {
     const { data, error } = await supabase.from('settings').select('clinic_config, exam_config').eq('id', 1).single();
     if (!error && data) {
       if (data.clinic_config) {
         setClinicConfig(data.clinic_config);
-        setRegTimes(generateTimes(data.clinic_config));
+        setRegTimes(generateTimeSlots(data.clinic_config.startTime, data.clinic_config.endTime, data.clinic_config.interval));
       }
       if (data.exam_config) {
         setExamConfig(data.exam_config);
-        setExTimes(generateTimes(data.exam_config));
+        setExTimes(generateTimeSlots(data.exam_config.startTime, data.exam_config.endTime, data.exam_config.interval));
       }
     } else if (error && error.code !== 'PGRST116') {
       console.error(error);
@@ -140,9 +126,25 @@ export default function AdminPage() {
 
   const fetchBookings = async () => {
     setLoadings(true);
+    
+    // 오늘 기준 1달 전 날짜 계산
+    const oneMonthAgoStr = format(subMonths(new Date(), 1), 'yyyy-MM-dd');
+
+    // 1달보다 오래된 데이터 자동 삭제
+    try {
+      await supabase
+        .from('clinics')
+        .delete()
+        .lt('clinic_date', oneMonthAgoStr);
+    } catch (e) {
+      console.warn('오래된 클리닉 데이터 자동 정리 예외:', e);
+    }
+
+    // 최근 1달 ~ 미래의 클리닉 데이터만 조회
     const { data, error } = await supabase
       .from('clinics')
       .select('*')
+      .gte('clinic_date', oneMonthAgoStr)
       .order('clinic_date', { ascending: true })
       .order('clinic_time', { ascending: true });
 
